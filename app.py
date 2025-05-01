@@ -1,4 +1,4 @@
-# app.py - Main Flask application for Beer Tap Management
+# app.py - Main Flask application for Keg Tap Management
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
 import sqlite3
 import os

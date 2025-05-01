@@ -1,7 +1,7 @@
 #!/bin/bash
-# setup.sh - Setup script for Beer Tap Manager on Raspberry Pi
+# setup.sh - Setup script for Keg Tap Manager on Raspberry Pi
 
-echo "Setting up Beer Tap Manager on Raspberry Pi..."
+echo "Setting up Keg Tap Manager on Raspberry Pi..."
 
 # Update system
 echo "Updating system packages..."
@@ -54,7 +54,7 @@ chmod +x start.sh
 echo "Creating systemd service for auto-start..."
 sudo tee /etc/systemd/system/keg_tap_server.service > /dev/null << EOF
 [Unit]
-Description=Beer Tap Manager
+Description=Keg Tap Manager
 After=network.target
 
 [Service]
@@ -76,7 +76,7 @@ sudo systemctl start keg_tap_server.service
 # Display IP address for user to access the web interface
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
 echo ""
-echo "Beer Tap Manager setup complete!"
+echo "Keg Tap Manager setup complete!"
 echo "You can access the web interface at: http://$IP_ADDRESS:5000"
 echo ""
 echo "To check service status: sudo systemctl status keg_tap_server.service"

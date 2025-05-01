@@ -1,4 +1,4 @@
--- Schema for beer tap management database
+-- Schema for Keg Tap management database
 
 -- Drop tables if they exist
 DROP TABLE IF EXISTS taps;

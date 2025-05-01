@@ -12,7 +12,7 @@ gc.collect()
 gc.threshold(gc.mem_free() // 4 + gc.mem_alloc())
 
 # Print system info
-print("Starting Beer Tap Display System")
+print("Starting Keg Tap Display System")
 print("Memory Free:", gc.mem_free())
 print("ESP32 Flash Size:", esp32.flash_size())
 

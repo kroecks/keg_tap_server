@@ -1,4 +1,4 @@
-# main.py for ESP32 S3 with 240x240 display for beer tap monitoring
+# main.py for ESP32 S3 with 240x240 display for Keg Tap monitoring
 import gc
 import network
 import urequests as requests

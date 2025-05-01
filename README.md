@@ -1,6 +1,6 @@
-# Beer Tap Manager System
+# Keg Tap Manager System
 
-This project creates a complete beer tap management system using a Raspberry Pi as a server and ESP32 S3 devices to display and monitor each tap. The system includes a web interface for managing beers and tap configurations.
+This project creates a complete Keg Tap management system using a Raspberry Pi as a server and ESP32 S3 devices to display and monitor each tap. The system includes a web interface for managing beers and tap configurations.
 
 ## System Components
 
@@ -33,8 +33,8 @@ This project creates a complete beer tap management system using a Raspberry Pi 
 1. Clone or download this repository to your Raspberry Pi:
 
 ```bash
-git clone <repository-url> ~/beer_tap_manager
-cd ~/beer_tap_manager
+git clone <repository-url> ~/keg_tap_server
+cd ~/keg_tap_server
 ```
 
 2. Run the setup script:
