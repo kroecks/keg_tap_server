@@ -12,8 +12,8 @@ echo "Installing dependencies..."
 sudo apt install -y python3-pip python3-venv python3-dev
 
 # Create project directory
-mkdir -p ~/beer_tap_manager
-cd ~/beer_tap_manager
+mkdir -p ~/keg_tap_server
+cd ~/keg_tap_server
 
 # Create virtual environment
 echo "Creating Python virtual environment..."
@@ -42,7 +42,7 @@ fi
 # Create a simple startup script
 cat > start.sh << EOF
 #!/bin/bash
-cd ~/beer_tap_manager
+cd ~/keg_tap_server
 source venv/bin/activate
 python app.py
 EOF
@@ -52,15 +52,15 @@ chmod +x start.sh
 
 # Create systemd service to run at startup
 echo "Creating systemd service for auto-start..."
-sudo tee /etc/systemd/system/beer-tap-manager.service > /dev/null << EOF
+sudo tee /etc/systemd/system/keg_tap_server.service > /dev/null << EOF
 [Unit]
 Description=Beer Tap Manager
 After=network.target
 
 [Service]
 User=$USER
-WorkingDirectory=/home/$USER/beer_tap_manager
-ExecStart=/home/$USER/beer_tap_manager/start.sh
+WorkingDirectory=/home/$USER/keg_tap_server
+ExecStart=/home/$USER/keg_tap_server/start.sh
 Restart=always
 RestartSec=10
 
@@ -70,8 +70,8 @@ EOF
 
 # Enable and start the service
 sudo systemctl daemon-reload
-sudo systemctl enable beer-tap-manager.service
-sudo systemctl start beer-tap-manager.service
+sudo systemctl enable keg_tap_server.service
+sudo systemctl start keg_tap_server.service
 
 # Display IP address for user to access the web interface
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
@@ -79,7 +79,7 @@ echo ""
 echo "Beer Tap Manager setup complete!"
 echo "You can access the web interface at: http://$IP_ADDRESS:5000"
 echo ""
-echo "To check service status: sudo systemctl status beer-tap-manager.service"
-echo "To manually start the service: sudo systemctl start beer-tap-manager.service"
-echo "To manually stop the service: sudo systemctl stop beer-tap-manager.service"
-echo "To view logs: sudo journalctl -u beer-tap-manager.service"
+echo "To check service status: sudo systemctl status keg_tap_server.service"
+echo "To manually start the service: sudo systemctl start keg_tap_server.service"
+echo "To manually stop the service: sudo systemctl stop keg_tap_server.service"
+echo "To view logs: sudo journalctl -u keg_tap_server.service"
