@@ -1,0 +1,335 @@
+<!-- base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Beer Tap Manager{% endblock %}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        nav {
+            background-color: #333;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-right: 15px;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        .container {
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        form {
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding:.75rem 1.5rem;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .beer-image {
+            max-width: 100px;
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <a href="{{ url_for('index') }}">Home</a>
+    <a href="{{ url_for('beers') }}">Beers</a>
+    <a href="{{ url_for('taps') }}">Taps</a>
+</nav>
+
+<div class="container">
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>
+
+<!-- index.html -->
+{% extends 'base.html' %}
+
+{% block title %}Home - Beer Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Beer Tap Manager</h1>
+<p>Welcome to the Beer Tap Manager. Use this system to manage your beers and tap configurations.</p>
+
+<h2>Current Tap Status</h2>
+{% if taps %}
+<table>
+    <thead>
+    <tr>
+        <th>Tap ID</th>
+        <th>Beer</th>
+        <th>Volume Left (ml)</th>
+        <th>Flow Rate (ml/s)</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for tap in taps %}
+    <tr>
+        <td>{{ tap.tap_id }}</td>
+        <td>{{ tap.beer_name or 'None' }}</td>
+        <td>{{ tap.volume }}</td>
+        <td>{{ tap.flow_rate }}</td>
+        <td>
+            <a href="{{ url_for('edit_tap', id=tap.id) }}">Edit</a>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No taps configured yet. <a href="{{ url_for('add_tap') }}">Add a tap</a>.</p>
+{% endif %}
+
+<h2>Available Beers</h2>
+{% if beers %}
+<table>
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>ABV</th>
+        <th>Image</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for beer in beers %}
+    <tr>
+        <td>{{ beer.name }}</td>
+        <td>{{ beer.abv }}%</td>
+        <td>
+            {% if beer.image_path %}
+            <img src="{{ url_for('static', filename=beer.image_path) }}" alt="{{ beer.name }}" class="beer-image">
+            {% else %}
+            No image
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No beers added yet. <a href="{{ url_for('add_beer') }}">Add a beer</a>.</p>
+{% endif %}
+{% endblock %}
+
+<!-- beers.html -->
+{% extends 'base.html' %}
+
+{% block title %}Beers - Beer Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Beer Management</h1>
+<a href="{{ url_for('add_beer') }}"><button>Add New Beer</button></a>
+
+<h2>Available Beers</h2>
+{% if beers %}
+<table>
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>ABV</th>
+        <th>Image</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for beer in beers %}
+    <tr>
+        <td>{{ beer.id }}</td>
+        <td>{{ beer.name }}</td>
+        <td>{{ beer.abv }}%</td>
+        <td>
+            {% if beer.image_path %}
+            <img src="{{ url_for('static', filename=beer.image_path) }}" alt="{{ beer.name }}" class="beer-image">
+            {% else %}
+            No image
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No beers added yet.</p>
+{% endif %}
+{% endblock %}
+
+<!-- add_beer.html -->
+{% extends 'base.html' %}
+
+{% block title %}Add Beer - Beer Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Add New Beer</h1>
+<form method="post" enctype="multipart/form-data">
+    <div>
+        <label for="name">Beer Name:</label>
+        <input type="text" id="name" name="name" required>
+    </div>
+    <div>
+        <label for="abv">ABV (%):</label>
+        <input type="number" id="abv" name="abv" step="0.1" min="0" required>
+    </div>
+    <div>
+        <label for="image">Beer Image:</label>
+        <input type="file" id="image" name="image" accept="image/*">
+    </div>
+    <button type="submit">Add Beer</button>
+</form>
+<a href="{{ url_for('beers') }}">Back to Beers</a>
+{% endblock %}
+
+<!-- taps.html -->
+{% extends 'base.html' %}
+
+{% block title %}Taps - Beer Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Tap Management</h1>
+<a href="{{ url_for('add_tap') }}"><button>Add New Tap</button></a>
+
+<h2>Configured Taps</h2>
+{% if taps %}
+<table>
+    <thead>
+    <tr>
+        <th>Tap ID</th>
+        <th>Beer</th>
+        <th>Volume Left (ml)</th>
+        <th>Flow Rate (ml/s)</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for tap in taps %}
+    <tr>
+        <td>{{ tap.tap_id }}</td>
+        <td>{{ tap.beer_name or 'None' }}</td>
+        <td>{{ tap.volume }}</td>
+        <td>{{ tap.flow_rate }}</td>
+        <td>
+            <a href="{{ url_for('edit_tap', id=tap.id) }}">Edit</a>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No taps configured yet.</p>
+{% endif %}
+{% endblock %}
+
+<!-- add_tap.html -->
+{% extends 'base.html' %}
+
+{% block title %}Add Tap - Beer Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Add New Tap</h1>
+<form method="post">
+    <div>
+        <label for="tap_id">Tap ID:</label>
+        <input type="text" id="tap_id" name="tap_id" required placeholder="e.g., tap_1">
+    </div>
+    <div>
+        <label for="beer_id">Beer:</label>
+        <select id="beer_id" name="beer_id">
+            <option value="">-- Select Beer --</option>
+            {% for beer in beers %}
+            <option value="{{ beer.id }}">{{ beer.name }} ({{ beer.abv }}%)</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label for="volume">Volume (ml):</label>
+        <input type="number" id="volume" name="volume" step="1" min="0" value="5000" required>
+    </div>
+    <div>
+        <label for="flow_rate">Flow Rate (ml/s):</label>
+        <input type="number" id="flow_rate" name="flow_rate" step="0.1" min="0.1" value="10.0" required>
+    </div>
+    <button type="submit">Add Tap</button>
+</form>
+<a href="{{ url_for('taps') }}">Back to Taps</a>
+{% endblock %}
+
+<!-- edit_tap.html -->
+{% extends 'base.html' %}
+
+{% block title %}Edit Tap - Beer Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Edit Tap</h1>
+<form method="post">
+    <div>
+        <label for="tap_id">Tap ID:</label>
+        <input type="text" id="tap_id" name="tap_id" value="{{ tap.tap_id }}" required>
+    </div>
+    <div>
+        <label for="beer_id">Beer:</label>
+        <select id="beer_id" name="beer_id">
+            <option value="">-- Select Beer --</option>
+            {% for beer in beers %}
+            <option value="{{ beer.id }}" {% if beer.id == tap.beer_id %}selected{% endif %}>
+                {{ beer.name }} ({{ beer.abv }}%)
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label for="volume">Volume (ml):</label>
+        <input type="number" id="volume" name="volume" step="1" min="0" value="{{ tap.volume }}" required>
+    </div>
+    <div>
+        <label for="flow_rate">Flow Rate (ml/s):</label>
+        <input type="number" id="flow_rate" name="flow_rate" step="0.1" min="0.1" value="{{ tap.flow_rate }}" required>
+    </div>
+    <button type="submit">Update Tap</button>
+</form>
+<a href="{{ url_for('taps') }}">Back to Taps</a>
+{% endblock %}
