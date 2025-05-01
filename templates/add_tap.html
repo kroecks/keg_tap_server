@@ -1,0 +1,33 @@
+<!-- add_tap.html -->
+{% extends 'base.html' %}
+
+{% block title %}Add Tap - Keg Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Add New Tap</h1>
+<form method="post">
+  <div>
+    <label for="tap_id">Tap ID:</label>
+    <input type="text" id="tap_id" name="tap_id" required placeholder="e.g., tap_1">
+  </div>
+  <div>
+    <label for="beer_id">Beer:</label>
+    <select id="beer_id" name="beer_id">
+      <option value="">-- Select Beer --</option>
+      {% for beer in beers %}
+      <option value="{{ beer.id }}">{{ beer.name }} ({{ beer.abv }}%)</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="volume">Volume (ml):</label>
+    <input type="number" id="volume" name="volume" step="1" min="0" value="5000" required>
+  </div>
+  <div>
+    <label for="flow_rate">Flow Rate (ml/s):</label>
+    <input type="number" id="flow_rate" name="flow_rate" step="0.1" min="0.1" value="10.0" required>
+  </div>
+  <button type="submit">Add Tap</button>
+</form>
+<a href="{{ url_for('taps') }}">Back to Taps</a>
+{% endblock %}

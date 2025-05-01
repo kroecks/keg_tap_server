@@ -1,0 +1,41 @@
+<!-- beers.html -->
+{% extends 'base.html' %}
+
+{% block title %}Beers - Keg Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Beer Management</h1>
+<a href="{{ url_for('add_beer') }}"><button>Add New Beer</button></a>
+
+<h2>Available Beers</h2>
+{% if beers %}
+<table>
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>ABV</th>
+        <th>Image</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for beer in beers %}
+    <tr>
+        <td>{{ beer.id }}</td>
+        <td>{{ beer.name }}</td>
+        <td>{{ beer.abv }}%</td>
+        <td>
+            {% if beer.image_path %}
+            <img src="{{ url_for('static', filename=beer.image_path) }}" alt="{{ beer.name }}" class="beer-image">
+            {% else %}
+            No image
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No beers added yet.</p>
+{% endif %}
+{% endblock %}

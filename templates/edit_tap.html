@@ -1,0 +1,35 @@
+<!-- edit_tap.html -->
+{% extends 'base.html' %}
+
+{% block title %}Edit Tap - Keg Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Edit Tap</h1>
+<form method="post">
+  <div>
+    <label for="tap_id">Tap ID:</label>
+    <input type="text" id="tap_id" name="tap_id" value="{{ tap.tap_id }}" required>
+  </div>
+  <div>
+    <label for="beer_id">Beer:</label>
+    <select id="beer_id" name="beer_id">
+      <option value="">-- Select Beer --</option>
+      {% for beer in beers %}
+      <option value="{{ beer.id }}" {% if beer.id == tap.beer_id %}selected{% endif %}>
+        {{ beer.name }} ({{ beer.abv }}%)
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="volume">Volume (ml):</label>
+    <input type="number" id="volume" name="volume" step="1" min="0" value="{{ tap.volume }}" required>
+  </div>
+  <div>
+    <label for="flow_rate">Flow Rate (ml/s):</label>
+    <input type="number" id="flow_rate" name="flow_rate" step="0.1" min="0.1" value="{{ tap.flow_rate }}" required>
+  </div>
+  <button type="submit">Update Tap</button>
+</form>
+<a href="{{ url_for('taps') }}">Back to Taps</a>
+{% endblock %}

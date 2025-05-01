@@ -1,0 +1,24 @@
+<!-- add_beer.html -->
+{% extends 'base.html' %}
+
+{% block title %}Add Beer - Keg Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Add New Beer</h1>
+<form method="post" enctype="multipart/form-data">
+  <div>
+    <label for="name">Beer Name:</label>
+    <input type="text" id="name" name="name" required>
+  </div>
+  <div>
+    <label for="abv">ABV (%):</label>
+    <input type="number" id="abv" name="abv" step="0.1" min="0" required>
+  </div>
+  <div>
+    <label for="image">Beer Image:</label>
+    <input type="file" id="image" name="image" accept="image/*">
+  </div>
+  <button type="submit">Add Beer</button>
+</form>
+<a href="{{ url_for('beers') }}">Back to Beers</a>
+{% endblock %}

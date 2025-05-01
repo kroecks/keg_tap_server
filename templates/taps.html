@@ -1,0 +1,40 @@
+<!-- taps.html -->
+{% extends 'base.html' %}
+
+{% block title %}Taps - Keg Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Tap Management</h1>
+<a href="{{ url_for('add_tap') }}"><button>Add New Tap</button></a>
+
+<h2>Configured Taps</h2>
+{% if taps %}
+<table>
+  <thead>
+  <tr>
+    <th>Tap ID</th>
+    <th>Beer</th>
+    <th>Volume Left (ml)</th>
+    <th>Flow Rate (ml/s)</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for tap in taps %}
+  <tr>
+    <td>{{ tap.tap_id }}</td>
+    <td>{{ tap.beer_name or 'None' }}</td>
+    <td>{{ tap.volume }}</td>
+    <td>{{ tap.flow_rate }}</td>
+    <td>
+      <a href="{{ url_for('edit_tap', id=tap.id) }}">Edit</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No taps configured yet.</p>
+{% endif %}
+{% endblock %}
+

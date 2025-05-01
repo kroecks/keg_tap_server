@@ -1,0 +1,69 @@
+<!-- index.html -->
+{% extends 'base.html' %}
+
+{% block title %}Home - Keg Tap Manager{% endblock %}
+
+{% block content %}
+<h1>Keg Tap Manager</h1>
+<p>Welcome to the Keg Tap Manager. Use this system to manage your beers and tap configurations.</p>
+
+<h2>Current Tap Status</h2>
+{% if taps %}
+<table>
+  <thead>
+  <tr>
+    <th>Tap ID</th>
+    <th>Beer</th>
+    <th>Volume Left (ml)</th>
+    <th>Flow Rate (ml/s)</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for tap in taps %}
+  <tr>
+    <td>{{ tap.tap_id }}</td>
+    <td>{{ tap.beer_name or 'None' }}</td>
+    <td>{{ tap.volume }}</td>
+    <td>{{ tap.flow_rate }}</td>
+    <td>
+      <a href="{{ url_for('edit_tap', id=tap.id) }}">Edit</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No taps configured yet. <a href="{{ url_for('add_tap') }}">Add a tap</a>.</p>
+{% endif %}
+
+<h2>Available Beers</h2>
+{% if beers %}
+<table>
+  <thead>
+  <tr>
+    <th>Name</th>
+    <th>ABV</th>
+    <th>Image</th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for beer in beers %}
+  <tr>
+    <td>{{ beer.name }}</td>
+    <td>{{ beer.abv }}%</td>
+    <td>
+      {% if beer.image_path %}
+      <img src="{{ url_for('static', filename=beer.image_path) }}" alt="{{ beer.name }}" class="beer-image">
+      {% else %}
+      No image
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No beers added yet. <a href="{{ url_for('add_beer') }}">Add a beer</a>.</p>
+{% endif %}
+{% endblock %}
