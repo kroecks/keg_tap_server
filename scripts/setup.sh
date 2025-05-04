@@ -22,7 +22,7 @@ source venv/bin/activate
 
 # Install Python dependencies
 echo "Installing Python packages..."
-pip install flask werkzeug
+pip install flask werkzeug Pillow
 
 # Create directory structure
 mkdir -p static/beer_images
