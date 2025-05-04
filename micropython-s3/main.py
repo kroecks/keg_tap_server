@@ -39,6 +39,9 @@ tft = None
 last_image = None
 current_beer = None
 
+gc.enable()
+gc.collect()
+
 # Directory for storing images
 IMAGE_DIR = "/images"
 try:
@@ -292,45 +295,6 @@ def download_beer_image():
         print("Error downloading image:", e)
         return False
 
-def display_scaled_image(image_path):
-    """Display an image scaled to fit the display"""
-    if not tft:
-        return
-
-    # Get image dimensions
-    dimensions = get_jpeg_dimensions(image_path)
-    if not dimensions:
-        print("Could not determine image dimensions")
-        # Fall back to using the full display size
-        tft.jpg(image_path, 0, 0, gc9a01.SLOW)
-        return
-
-    img_width, img_height = dimensions
-    print(f"Original image dimensions: {img_width}x{img_height}")
-
-    # Calculate scaling parameters
-    new_width, new_height, x_offset, y_offset = fit_image_to_display(img_width, img_height)
-    print(f"Scaled dimensions: {new_width}x{new_height}, offset: ({x_offset},{y_offset})")
-
-    # Clear the image area
-    tft.fill_rect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0)  # Black background
-
-    # If jpegdec module is available, use it for better scaling
-    if jpegdec:
-        try:
-            jpeg = jpegdec.JPEG(tft)
-            jpeg.open(image_path)
-            jpeg.scale(new_width / img_width)
-            jpeg.decode(x_offset, y_offset)
-        except Exception as e:
-            print("Error with jpegdec:", e)
-            # Fall back to built-in method
-            tft.jpg(image_path, x_offset, y_offset, gc9a01.SLOW)
-    else:
-        # Use built-in JPG method - note this may not respect scaling
-        # but will at least center the image
-        tft.jpg(image_path, x_offset, y_offset, gc9a01.SLOW)
-
 def display_tap_info():
     print("display tap info")
     """Display the current tap information and beer image"""
@@ -361,24 +325,24 @@ def display_tap_info():
                 else:
                     # For larger images, we need a display strategy
                     # Since we can't scale without jpegdec, we'll center and crop
-                    display_scaled_image(last_image)
-#                     print("Image larger than display, centering and displaying")
-#
-#                     # Calculate center points
-#                     img_center_x = img_width // 2
-#                     img_center_y = img_height // 2
-#
-#                     # Calculate x and y offsets as negative values
-#                     # This effectively crops to the center of the image
-#                     x_offset = -(img_center_x - DISPLAY_WIDTH // 2)
-#                     y_offset = -(img_center_y - DISPLAY_HEIGHT // 2)
-#
-#                     print(f"Centering large image with offset ({x_offset},{y_offset})")
-#                     tft.jpg(last_image, x_offset, y_offset, gc9a01.SLOW)
+#                     display_scaled_image(last_image)
+                    print("Image larger than display, centering and displaying")
+
+                    # Calculate center points
+                    img_center_x = img_width // 2
+                    img_center_y = img_height // 2
+
+                    # Calculate x and y offsets as negative values
+                    # This effectively crops to the center of the image
+                    x_offset = -(img_center_x - DISPLAY_WIDTH // 2)
+                    y_offset = -(img_center_y - DISPLAY_HEIGHT // 2)
+
+                    print(f"Centering large image with offset ({x_offset},{y_offset})")
+                    tft.jpg(last_image, x_offset, y_offset, gc9a01.SLOW)
             else:
                 # Can't determine dimensions, just display at 0,0
                 print("Unable to determine image dimensions, displaying at origin")
-                tft.jpg(last_image, 0, 0, gc9a01.SLOW)
+                tft.jpg(last_image, 0, 0, gc9a01.FAST)
         except Exception as e:
             print("Error displaying image:", e)
 
@@ -394,9 +358,9 @@ def display_tap_info():
 
     # Display beer information as overlay
     y_offset = 180
-    center(noto_sans, current_beer['beer_name'] or "No beer", 10 + y_offset, gc9a01.WHITE)
-    center(noto_sans,f"{current_beer['beer_abv']}% ABV" if current_beer['beer_abv'] else "", 25 + y_offset, gc9a01.WHITE)
-    center(noto_sans, f"Left: {remaining_percent}%", 40 + y_offset, gc9a01.WHITE)
+    center(noto_sans, current_beer['beer_name'] or "No beer", 10, gc9a01.WHITE)
+    center(noto_sans,f"{current_beer['beer_abv']}% ABV" if current_beer['beer_abv'] else "", y_offset - 20, gc9a01.WHITE)
+    center(noto_sans, f"Left: {remaining_percent}%", 20 + y_offset, gc9a01.WHITE)
 
 def flow_callback(p):
     """Interrupt handler for flow sensor pulses"""
@@ -460,21 +424,6 @@ def report_pour_event(event_type, duration=None):
         print("Error reporting pour event:", e)
         return False
 
-def install_jpegdec():
-    """
-    Attempt to install the jpegdec library.
-    Only needs to be run once.
-    """
-    try:
-        print("Attempting to install jpegdec library...")
-        import mip
-        mip.install("micropython-jpegdec")
-        print("Installation complete. Please restart the device.")
-        return True
-    except Exception as e:
-        print("Failed to install library:", e)
-        return False
-
 def main():
     """Main function to initialize and run the system"""
     global timer_flow
@@ -498,15 +447,6 @@ def main():
             print("Failed to connect to WiFi again, can't continue")
             display_message("WiFi Failed!", 100)
             return
-
-    # Attempt to install jpegdec library if needed and internet is available
-    try:
-        import jpegdec
-        print("jpegdec library already installed")
-    except ImportError:
-        # Uncomment the following line to enable automatic installation
-        install_jpegdec()
-        pass  # Skip installation for now
 
     # Initial fetch of tap info
     if not fetch_tap_info():
@@ -536,3 +476,5 @@ if __name__ == "__main__":
         print("Fatal error:", e)
         if tft:
             display_message(f"Error: {e}", 100)
+
+

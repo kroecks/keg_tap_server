@@ -161,14 +161,15 @@ def get_tap_image(tap_id):
         image_path = os.path.join('static/beer_images', image_filename)
 
     if not width or not height:
-        # No resizing requested, return the image directly
-        return send_file(image_path)
+        return send_file(image_path, mimetype='image/jpeg')
 
-    # Open and resize the image using Pillow
+    # Open and convert image to RGB (JPEG doesn't support alpha)
     with Image.open(image_path) as img:
         img.thumbnail((width, height), Image.LANCZOS)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")  # Drop alpha channel for JPEG
         img_io = io.BytesIO()
-        img.save(img_io, format='JPEG')
+        img.save(img_io, format='JPEG', quality=85)
         img_io.seek(0)
         return send_file(img_io, mimetype='image/jpeg')
 
