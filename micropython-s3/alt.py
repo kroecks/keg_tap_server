@@ -11,6 +11,11 @@ from truetype import NotoSerif_32 as noto_serif
 from truetype import NotoSansMono_32 as noto_mono
 from machine import Pin, SPI, Timer, freq
 import gc9a01
+try:
+    import jpegdec
+except ImportError:
+    print("jpegdec module not available, using builtin jpeg support")
+    jpegdec = None
 
 # Set CPU frequency to 240MHz for better performance
 freq(240000000)
@@ -45,9 +50,6 @@ try:
     os.mkdir(IMAGE_DIR)
 except:
     pass  # Directory already exists
-
-# Flag to control whether we try to use server-side resizing
-USE_SERVER_RESIZE = True  # Set to False if your server doesn't support this feature
 
 def init_display():
     global tft
@@ -159,76 +161,28 @@ def fetch_tap_info():
         time.sleep(2)
         return False
 
-def get_jpeg_dimensions(filename):
+def fit_image_to_display(img_width, img_height, display_width=DISPLAY_WIDTH, display_height=DISPLAY_HEIGHT):
     """
-    Extract dimensions from a JPEG file header
-    Returns (width, height) or None if dimensions can't be determined
-    """
-    try:
-        with open(filename, "rb") as f:
-            # Check for JPEG SOI marker
-            if f.read(2) != b'\xFF\xD8':
-                return None
-
-            while True:
-                marker = f.read(2)
-                if len(marker) < 2:
-                    return None
-
-                # Check for Start of Frame markers (SOF0, SOF1, SOF2)
-                if marker[0] == 0xFF and marker[1] in [0xC0, 0xC1, 0xC2]:
-                    # Skip length (2 bytes)
-                    f.read(2)
-                    # Skip precision (1 byte)
-                    f.read(1)
-
-                    # Read height and width (2 bytes each)
-                    height_bytes = f.read(2)
-                    width_bytes = f.read(2)
-
-                    height = (height_bytes[0] << 8) + height_bytes[1]
-                    width = (width_bytes[0] << 8) + width_bytes[1]
-
-                    print(f"get_jpeg_dimensions dimensions: {filename} {width}x{height}")
-                    return width, height
-                else:
-                    # Skip this section
-                    size_bytes = f.read(2)
-                    if len(size_bytes) < 2:
-                        return None
-
-                    size = (size_bytes[0] << 8) + size_bytes[1] - 2
-                    if size < 0:
-                        return None  # Corrupt JPEG
-                    f.seek(size, 1)  # Skip ahead
-    except Exception as e:
-        print("Error reading JPEG dimensions:", e)
-        return None
-
-def fit_image_to_display(img_width, img_height):
-    """
-    Calculate scaling to fit image within display while maintaining aspect ratio
+    Calculate the dimensions to fit an image within the display while maintaining aspect ratio
     Returns: (new_width, new_height, x_offset, y_offset)
     """
-    print(f"fit_image_to_display dimensions: {img_width}x{img_height}")
-
     # Calculate aspect ratios
     img_aspect = img_width / img_height
-    display_aspect = DISPLAY_WIDTH / DISPLAY_HEIGHT
+    display_aspect = display_width / display_height
 
     # Determine which dimension is the limiting factor
     if img_aspect > display_aspect:
         # Image is wider than display (relative to height)
-        new_width = DISPLAY_WIDTH
-        new_height = int(DISPLAY_WIDTH / img_aspect)
+        new_width = display_width
+        new_height = int(display_width / img_aspect)
         x_offset = 0
-        y_offset = (DISPLAY_HEIGHT - new_height) // 2
+        y_offset = (display_height - new_height) // 2
     else:
         # Image is taller than display (relative to width)
-        new_height = DISPLAY_HEIGHT
-        new_width = int(DISPLAY_HEIGHT * img_aspect)
+        new_height = display_height
+        new_width = int(display_height * img_aspect)
         y_offset = 0
-        x_offset = (DISPLAY_WIDTH - new_width) // 2
+        x_offset = (display_width - new_width) // 2
 
     return new_width, new_height, x_offset, y_offset
 
@@ -237,37 +191,6 @@ def download_beer_image():
     global last_image
 
     try:
-        # First attempt: Try to get a server-resized image if the feature is enabled
-        if USE_SERVER_RESIZE:
-            try:
-                # Request pre-scaled image from server - adapt URL as needed for your server
-                resized_image_path = f"{IMAGE_DIR}/{TAP_ID}_resized.jpg"
-
-                # Remove existing image if it exists
-                try:
-                    os.remove(resized_image_path)
-                except:
-                    pass
-
-                # Request resized image - adjust URL as needed for your API
-                print("Requesting resized image from server...")
-                response = requests.get(
-                    f"{SERVER_URL}/api/tap/{TAP_ID}/image?width={DISPLAY_WIDTH}&height={DISPLAY_HEIGHT}")
-
-                if response.status_code == 200:
-                    with open(resized_image_path, 'wb') as f:
-                        f.write(response.content)
-                    print(f"Resized image downloaded to {resized_image_path}")
-                    last_image = resized_image_path
-                    return True
-                else:
-                    print("Server resize failed, falling back to original image")
-                    # Fall through to download original image
-            except Exception as e:
-                print("Error with server resize:", e)
-                # Fall through to download original image
-
-        # Download the original image if server resize failed or is disabled
         image_path = f"{IMAGE_DIR}/{TAP_ID}.jpg"
 
         # Delete existing image if exists
@@ -291,6 +214,84 @@ def download_beer_image():
     except Exception as e:
         print("Error downloading image:", e)
         return False
+
+def display_tap_info():
+    print("display tap info")
+    """Display the current tap information and beer image"""
+    global tft, current_beer, last_image
+
+    if not tft or not current_beer:
+        return
+
+    # Clear the screen
+    tft.fill(0)
+
+    print("display image")
+    # Display beer image if available
+    if last_image:
+        try:
+            display_scaled_image(last_image)
+        except Exception as e:
+            print("Error displaying image:", e)
+
+    print("finished display image")
+
+    # Calculate remaining beer percentage
+    if current_beer['volume'] > 0:
+        # Assume a keg is typically 5000ml (5L) when full
+        full_volume = 5000  # Can be adjusted
+        remaining_percent = min(100, int((current_beer['volume'] / full_volume) * 100))
+    else:
+        remaining_percent = 0
+
+    # Display beer information as overlay
+    y_offset = 180
+    center(noto_sans, current_beer['beer_name'] or "No beer", 10 + y_offset, gc9a01.WHITE)
+    center(noto_sans,f"{current_beer['beer_abv']}% ABV" if current_beer['beer_abv'] else "", 25 + y_offset, gc9a01.WHITE)
+    center(noto_sans, f"Left: {remaining_percent}%", 40 + y_offset, gc9a01.WHITE)
+
+def get_jpeg_dimensions(filename):
+    """
+    Extract dimensions from a JPEG file header
+    Returns (width, height) or None if dimensions can't be determined
+    """
+    try:
+        with open(filename, "rb") as f:
+            # Check for JPEG SOI marker
+            if f.read(2) != b'\xFF\xD8':
+                return None
+
+            while True:
+                marker = f.read(2)
+                if len(marker) < 2:
+                    return None
+
+                # Check for Start of Frame markers
+                if marker[0] == 0xFF and marker[1] in [0xC0, 0xC1, 0xC2]:
+                    # Skip length (2 bytes)
+                    f.read(2)
+                    # Skip precision (1 byte)
+                    f.read(1)
+
+                    # Read height and width (2 bytes each)
+                    height_bytes = f.read(2)
+                    width_bytes = f.read(2)
+
+                    height = (height_bytes[0] << 8) + height_bytes[1]
+                    width = (width_bytes[0] << 8) + width_bytes[1]
+
+                    return width, height
+                else:
+                    # Skip this section
+                    size_bytes = f.read(2)
+                    if len(size_bytes) < 2:
+                        return None
+
+                    size = (size_bytes[0] << 8) + size_bytes[1] - 2
+                    f.seek(size, 1)  # Skip ahead
+    except Exception as e:
+        print("Error reading JPEG dimensions:", e)
+        return None
 
 def display_scaled_image(image_path):
     """Display an image scaled to fit the display"""
@@ -330,73 +331,6 @@ def display_scaled_image(image_path):
         # Use built-in JPG method - note this may not respect scaling
         # but will at least center the image
         tft.jpg(image_path, x_offset, y_offset, gc9a01.SLOW)
-
-def display_tap_info():
-    print("display tap info")
-    """Display the current tap information and beer image"""
-    global tft, current_beer, last_image
-
-    if not tft or not current_beer:
-        return
-
-    # Clear the screen
-    tft.fill(0)
-
-    print("display image")
-    # Display beer image if available
-    if last_image:
-        try:
-            # Get image dimensions
-            dimensions = get_jpeg_dimensions(last_image)
-            if dimensions:
-                img_width, img_height = dimensions
-                print(f"Image dimensions: {img_width}x{img_height}")
-
-                # If image is small enough, display directly in the center
-                if img_width <= DISPLAY_WIDTH and img_height <= DISPLAY_HEIGHT:
-                    x_offset = (DISPLAY_WIDTH - img_width) // 2
-                    y_offset = (DISPLAY_HEIGHT - img_height) // 2
-                    print(f"Displaying image centered at ({x_offset},{y_offset})")
-                    tft.jpg(last_image, x_offset, y_offset, gc9a01.SLOW)
-                else:
-                    # For larger images, we need a display strategy
-                    # Since we can't scale without jpegdec, we'll center and crop
-                    display_scaled_image(last_image)
-#                     print("Image larger than display, centering and displaying")
-#
-#                     # Calculate center points
-#                     img_center_x = img_width // 2
-#                     img_center_y = img_height // 2
-#
-#                     # Calculate x and y offsets as negative values
-#                     # This effectively crops to the center of the image
-#                     x_offset = -(img_center_x - DISPLAY_WIDTH // 2)
-#                     y_offset = -(img_center_y - DISPLAY_HEIGHT // 2)
-#
-#                     print(f"Centering large image with offset ({x_offset},{y_offset})")
-#                     tft.jpg(last_image, x_offset, y_offset, gc9a01.SLOW)
-            else:
-                # Can't determine dimensions, just display at 0,0
-                print("Unable to determine image dimensions, displaying at origin")
-                tft.jpg(last_image, 0, 0, gc9a01.SLOW)
-        except Exception as e:
-            print("Error displaying image:", e)
-
-    print("finished display image")
-
-    # Calculate remaining beer percentage
-    if current_beer['volume'] > 0:
-        # Assume a keg is typically 5000ml (5L) when full
-        full_volume = 5000  # Can be adjusted
-        remaining_percent = min(100, int((current_beer['volume'] / full_volume) * 100))
-    else:
-        remaining_percent = 0
-
-    # Display beer information as overlay
-    y_offset = 180
-    center(noto_sans, current_beer['beer_name'] or "No beer", 10 + y_offset, gc9a01.WHITE)
-    center(noto_sans,f"{current_beer['beer_abv']}% ABV" if current_beer['beer_abv'] else "", 25 + y_offset, gc9a01.WHITE)
-    center(noto_sans, f"Left: {remaining_percent}%", 40 + y_offset, gc9a01.WHITE)
 
 def flow_callback(p):
     """Interrupt handler for flow sensor pulses"""
@@ -460,21 +394,6 @@ def report_pour_event(event_type, duration=None):
         print("Error reporting pour event:", e)
         return False
 
-def install_jpegdec():
-    """
-    Attempt to install the jpegdec library.
-    Only needs to be run once.
-    """
-    try:
-        print("Attempting to install jpegdec library...")
-        import mip
-        mip.install("micropython-jpegdec")
-        print("Installation complete. Please restart the device.")
-        return True
-    except Exception as e:
-        print("Failed to install library:", e)
-        return False
-
 def main():
     """Main function to initialize and run the system"""
     global timer_flow
@@ -498,15 +417,6 @@ def main():
             print("Failed to connect to WiFi again, can't continue")
             display_message("WiFi Failed!", 100)
             return
-
-    # Attempt to install jpegdec library if needed and internet is available
-    try:
-        import jpegdec
-        print("jpegdec library already installed")
-    except ImportError:
-        # Uncomment the following line to enable automatic installation
-        install_jpegdec()
-        pass  # Skip installation for now
 
     # Initial fetch of tap info
     if not fetch_tap_info():

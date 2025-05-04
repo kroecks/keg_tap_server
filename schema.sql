@@ -1,25 +1,21 @@
 -- Schema for Keg Tap management database
 
--- Drop tables if they exist
-DROP TABLE IF EXISTS taps;
-DROP TABLE IF EXISTS beers;
-
 -- Create beers table
-CREATE TABLE beers (
-                       id INTEGER PRIMARY KEY AUTOINCREMENT,
-                       name TEXT NOT NULL,
-                       abv REAL NOT NULL,
-                       image_path TEXT
+CREATE TABLE IF NOT EXISTS beers (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     name TEXT NOT NULL,
+     abv REAL NOT NULL,
+     image_path TEXT
 );
 
 -- Create taps table
-CREATE TABLE taps (
-                      id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      tap_id TEXT UNIQUE NOT NULL,
-                      beer_id INTEGER,
-                      volume REAL NOT NULL DEFAULT 0,  -- in milliliters
-                      flow_rate REAL NOT NULL DEFAULT 1.0,  -- in milliliters per second
-                      FOREIGN KEY (beer_id) REFERENCES beers (id)
+CREATE TABLE IF NOT EXISTS taps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tap_id TEXT NOT NULL,
+    beer_id INTEGER,
+    volume REAL NOT NULL,
+    flow_rate REAL NOT NULL,
+    FOREIGN KEY (beer_id) REFERENCES beers (id)
 );
 
 -- Insert some sample data

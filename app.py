@@ -1,5 +1,7 @@
 # app.py - Main Flask application for Keg Tap Management
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory, send_file
+from PIL import Image
+import io
 import sqlite3
 import os
 from werkzeug.utils import secure_filename
@@ -143,17 +145,32 @@ def get_tap_info(tap_id):
 
 @app.route('/api/tap/<tap_id>/image', methods=['GET'])
 def get_tap_image(tap_id):
+    width = request.args.get('width', type=int)
+    height = request.args.get('height', type=int)
+
     conn = get_db_connection()
     tap = conn.execute('SELECT beers.image_path FROM taps '
-                     'LEFT JOIN beers ON taps.beer_id = beers.id '
-                     'WHERE tap_id = ?', (tap_id,)).fetchone()
+                       'LEFT JOIN beers ON taps.beer_id = beers.id '
+                       'WHERE tap_id = ?', (tap_id,)).fetchone()
     conn.close()
 
     if not tap or not tap['image_path']:
-        return send_from_directory('static/beer_images', 'default.jpg')
+        image_path = os.path.join('static/beer_images', 'default.jpg')
+    else:
+        image_filename = os.path.basename(tap['image_path'])
+        image_path = os.path.join('static/beer_images', image_filename)
 
-    image_filename = os.path.basename(tap['image_path'])
-    return send_from_directory('static/beer_images', image_filename)
+    if not width or not height:
+        # No resizing requested, return the image directly
+        return send_file(image_path)
+
+    # Open and resize the image using Pillow
+    with Image.open(image_path) as img:
+        img.thumbnail((width, height), Image.LANCZOS)
+        img_io = io.BytesIO()
+        img.save(img_io, format='JPEG')
+        img_io.seek(0)
+        return send_file(img_io, mimetype='image/jpeg')
 
 @app.route('/api/tap/<tap_id>/update_volume', methods=['POST'])
 def update_volume(tap_id):
