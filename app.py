@@ -165,9 +165,25 @@ def get_tap_image(tap_id):
 
     # Open and resize the image using Pillow
     with Image.open(image_path) as img:
-        img.thumbnail((width, height), Image.LANCZOS)
+        # Convert mode before resizing/cropping
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
+
+        # Calculate scale and crop to fill
+        src_ratio = img.width / img.height
+        target_ratio = width / height
+
+        if target_ratio > src_ratio:
+            scale_height = int(width / src_ratio)
+            img = img.resize((width, scale_height), Image.LANCZOS)
+            top = (scale_height - height) // 2
+            img = img.crop((0, top, width, top + height))
+        else:
+            scale_width = int(height * src_ratio)
+            img = img.resize((scale_width, height), Image.LANCZOS)
+            left = (scale_width - width) // 2
+            img = img.crop((left, 0, left + width, height))
+
         img_io = io.BytesIO()
         img.save(img_io, format='JPEG', quality=85)
         img_io.seek(0)

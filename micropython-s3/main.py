@@ -61,10 +61,10 @@ def init_display():
             SPI(2, baudrate=80000000, polarity=0, sck=Pin(10), mosi=Pin(11)),
             240,
             240,
-            reset=Pin(14, Pin.OUT),
+            reset=Pin(12, Pin.OUT),
             cs=Pin(9, Pin.OUT),
             dc=Pin(8, Pin.OUT),
-            backlight=Pin(2, Pin.OUT),
+            backlight=Pin(40, Pin.OUT),
             rotation=0)
 
         print("Init display 2...")
@@ -296,7 +296,6 @@ def download_beer_image():
         return False
 
 def display_tap_info():
-    print("display tap info")
     """Display the current tap information and beer image"""
     global tft, current_beer, last_image
 
@@ -306,7 +305,6 @@ def display_tap_info():
     # Clear the screen
     tft.fill(0)
 
-    print("display image")
     # Display beer image if available
     if last_image:
         try:
@@ -346,8 +344,6 @@ def display_tap_info():
         except Exception as e:
             print("Error displaying image:", e)
 
-    print("finished display image")
-
     # Calculate remaining beer percentage
     if current_beer['volume'] > 0:
         # Assume a keg is typically 5000ml (5L) when full
@@ -358,9 +354,9 @@ def display_tap_info():
 
     # Display beer information as overlay
     y_offset = 180
-    center(noto_sans, current_beer['beer_name'] or "No beer", 10, gc9a01.WHITE)
-    center(noto_sans,f"{current_beer['beer_abv']}% ABV" if current_beer['beer_abv'] else "", y_offset - 20, gc9a01.WHITE)
-    center(noto_sans, f"Left: {remaining_percent}%", 20 + y_offset, gc9a01.WHITE)
+    center(noto_sans, current_beer['beer_name'] or "No beer", 50, gc9a01.WHITE)
+    center(noto_sans,f"{current_beer['beer_abv']}% ABV" if current_beer['beer_abv'] else "", y_offset, gc9a01.WHITE)
+#     center(noto_sans, f"Left: {remaining_percent}%", 20 + y_offset, gc9a01.WHITE)
 
 def flow_callback(p):
     """Interrupt handler for flow sensor pulses"""
