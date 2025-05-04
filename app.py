@@ -163,11 +163,11 @@ def get_tap_image(tap_id):
     if not width or not height:
         return send_file(image_path, mimetype='image/jpeg')
 
-    # Open and convert image to RGB (JPEG doesn't support alpha)
+    # Open and resize the image using Pillow
     with Image.open(image_path) as img:
         img.thumbnail((width, height), Image.LANCZOS)
         if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")  # Drop alpha channel for JPEG
+            img = img.convert("RGB")
         img_io = io.BytesIO()
         img.save(img_io, format='JPEG', quality=85)
         img_io.seek(0)
