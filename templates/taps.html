@@ -24,6 +24,13 @@
   <tr>
     <td>{{ tap.tap_id }}</td>
     <td>{{ tap.beer_name or 'None' }}</td>
+    <td>
+      {% if tap.beer_image %}
+      <img src="{{ url_for('static', filename=tap.beer_image) }}" alt="{{ tap.beer_name }}" class="beer-image">
+      {% else %}
+      No image
+      {% endif %}
+    </td>
     <td>{{ tap.volume }}</td>
     <td>{{ tap.full_volume }}</td>
     <td>{{ tap.flow_rate }}</td>

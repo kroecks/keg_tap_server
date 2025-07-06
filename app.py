@@ -71,7 +71,7 @@ def add_beer():
 @app.route('/taps')
 def taps():
     conn = get_db_connection()
-    taps = conn.execute('SELECT taps.id, taps.tap_id, taps.beer_id, taps.volume, taps.full_volume, taps.flow_rate, beers.name AS beer_name '
+    taps = conn.execute('SELECT taps.id, taps.tap_id, taps.beer_id, taps.volume, taps.full_volume, taps.flow_rate, beers.name AS beer_name, beers.image_path as beer_image '
                       'FROM taps LEFT JOIN beers ON taps.beer_id = beers.id').fetchall()
     beers = conn.execute('SELECT * FROM beers').fetchall()
     conn.close()
