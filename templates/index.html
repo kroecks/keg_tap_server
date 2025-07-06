@@ -15,6 +15,7 @@
     <th>Tap ID</th>
     <th>Beer</th>
     <th>Volume Left (ml)</th>
+    <th>Starting Volume (ml)</th>
     <th>Flow Rate (ml/s)</th>
     <th>Actions</th>
   </tr>
@@ -25,6 +26,7 @@
     <td>{{ tap.tap_id }}</td>
     <td>{{ tap.beer_name or 'None' }}</td>
     <td>{{ tap.volume }}</td>
+    <td>{{ tap.full_volume }}</td>
     <td>{{ tap.flow_rate }}</td>
     <td>
       <a href="{{ url_for('edit_tap', id=tap.id) }}">Edit</a>

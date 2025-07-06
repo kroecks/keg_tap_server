@@ -11,6 +11,9 @@ from truetype import NotoSerif_32 as noto_serif
 from truetype import NotoSansMono_32 as noto_mono
 from machine import Pin, SPI, Timer, freq
 import gc9a01
+import neopixel
+import machine
+from micropython import const
 
 # Set CPU frequency to 240MHz for better performance
 freq(240000000)
@@ -18,7 +21,7 @@ freq(240000000)
 # Configuration
 WIFI_SSID = "Nexus"
 WIFI_PASSWORD = "thescaryd00r"
-SERVER_URL = "http://beerpi:5000"  # Replace with your Raspberry Pi IP
+SERVER_URL = "http://beerpi.kenandmidi.com:5000"  # Replace with your Raspberry Pi IP
 TAP_ID = "tap_1"  # Can be modified for each device
 
 # Display configuration
@@ -33,6 +36,22 @@ flow_start_time = 0
 flow_active = False
 FLOW_DETECTION_THRESHOLD = 5  # Number of pulses to detect as active flow
 FLOW_TIMEOUT = 2000  # milliseconds without pulses to consider flow stopped
+
+# Status/Keg Level LED strip on port 33
+STATUS_LED_PIN = 33
+LED_COUNT = 8
+status_leds = neopixel.NeoPixel(Pin(STATUS_LED_PIN), LED_COUNT)
+
+# Status LED colors (for startup sequence)
+STATUS_RED = (255, 0, 0)      # No WiFi
+STATUS_YELLOW = (255, 255, 0)  # WiFi connected, loading tap data
+STATUS_GREEN = (0, 255, 0)     # Tap data loaded successfully
+
+# Keg level colors
+KEG_FULL = (0, 255, 0)        # Green for full levels
+KEG_MEDIUM = (255, 255, 0)    # Yellow for medium levels
+KEG_LOW = (255, 0, 0)         # Red for low levels
+KEG_EMPTY = (0, 0, 0)         # Off for empty
 
 # Initialize display
 tft = None
@@ -52,6 +71,37 @@ except:
 # Flag to control whether we try to use server-side resizing
 USE_SERVER_RESIZE = True  # Set to False if your server doesn't support this feature
 
+def set_status_led(color):
+    """Set all LEDs to the same color for status indication"""
+    for i in range(LED_COUNT):
+        status_leds[i] = color
+    status_leds.write()
+
+def set_keg_level_leds(remaining_percent):
+    """Set LEDs based on keg fullness percentage"""
+    # Calculate how many LEDs should be lit based on percentage
+    leds_to_light = int((remaining_percent / 100.0) * LED_COUNT)
+
+    for i in range(LED_COUNT):
+        if i < leds_to_light:
+            # Determine color based on percentage ranges
+            led_position_percent = ((i + 1) / LED_COUNT) * 100
+
+            if led_position_percent <= 25:
+                # Bottom 25% - Red (low)
+                status_leds[i] = KEG_LOW
+            elif led_position_percent <= 75:
+                # Middle 50% - Yellow (medium)
+                status_leds[i] = KEG_MEDIUM
+            else:
+                # Top 25% - Green (full)
+                status_leds[i] = KEG_FULL
+        else:
+            # Turn off LEDs that shouldn't be lit
+            status_leds[i] = KEG_EMPTY
+
+    status_leds.write()
+
 def init_display():
     global tft
     try:
@@ -61,10 +111,10 @@ def init_display():
             SPI(2, baudrate=80000000, polarity=0, sck=Pin(10), mosi=Pin(11)),
             240,
             240,
-            reset=Pin(12, Pin.OUT),
+            reset=Pin(14, Pin.OUT),
             cs=Pin(9, Pin.OUT),
             dc=Pin(8, Pin.OUT),
-            backlight=Pin(40, Pin.OUT),
+            backlight=Pin(2, Pin.OUT),
             rotation=0)
 
         print("Init display 2...")
@@ -81,14 +131,14 @@ def init_display():
         return False
 
 def center(font, s, row, color=gc9a01.WHITE):
-        screen = tft.width()                     # get screen width
-        width = tft.write_len(font, s)           # get the width of the string
-        if width and width < screen:             # if the string < display
-            col = tft.width() // 2 - width // 2  # find the column to center
-        else:                                    # otherwise
-            col = 0                              # left justify
+    screen = tft.width()                     # get screen width
+    width = tft.write_len(font, s)           # get the width of the string
+    if width and width < screen:             # if the string < display
+        col = tft.width() // 2 - width // 2  # find the column to center
+    else:                                    # otherwise
+        col = 0                              # left justify
 
-        tft.write(font, s, col, row, color)      # and write the string
+    tft.write(font, s, col, row, color)      # and write the string
 
 def display_message(message, y_pos=120):
     """Display a centered message on the screen"""
@@ -97,6 +147,9 @@ def display_message(message, y_pos=120):
 
 def connect_wifi():
     display_message("Connecting to WiFi...")
+    # Set status LED to red (no WiFi)
+    set_status_led(STATUS_RED)
+
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
 
@@ -118,17 +171,23 @@ def connect_wifi():
             ip = wlan.ifconfig()[0]
             print(f"IP: {ip}")
             display_message(f"Connected: {ip}", 100)
+            # Set status LED to yellow (WiFi connected, loading data)
+            set_status_led(STATUS_YELLOW)
             time.sleep(2)
             return True
         else:
             print("Failed to connect to WiFi")
             display_message("WiFi Failed!", 100)
+            # Keep status LED red
+            set_status_led(STATUS_RED)
             time.sleep(2)
             return False
     else:
         print("Already connected to WiFi")
         ip = wlan.ifconfig()[0]
         print(f"IP: {ip}")
+        # Set status LED to yellow (WiFi connected, loading data)
+        set_status_led(STATUS_YELLOW)
         return True
 
 def fetch_tap_info():
@@ -137,6 +196,9 @@ def fetch_tap_info():
 
     try:
         display_message("Fetching tap info...")
+        # Keep status LED yellow while fetching
+        set_status_led(STATUS_YELLOW)
+
         response = requests.get(f"{SERVER_URL}/api/tap/{TAP_ID}")
 
         if response.status_code == 200:
@@ -150,15 +212,22 @@ def fetch_tap_info():
 
             print("Retrieved image, displaying tap info")
             display_tap_info()
+
+            # Set status LED to green (tap data loaded successfully)
+            set_status_led(STATUS_GREEN)
             return True
         else:
             print(f"Error fetching tap info: {response.status_code}")
             display_message(f"Error: {response.status_code}")
+            # Keep status LED yellow on error
+            set_status_led(STATUS_YELLOW)
             time.sleep(2)
             return False
     except Exception as e:
         print("Error fetching tap info:", e)
         display_message("Connection Error")
+        # Keep status LED yellow on error
+        set_status_led(STATUS_YELLOW)
         time.sleep(2)
         return False
 
@@ -299,6 +368,8 @@ def display_tap_info():
     """Display the current tap information and beer image"""
     global tft, current_beer, last_image
 
+    print(f"display_tap_info")
+
     if not tft or not current_beer:
         return
 
@@ -323,7 +394,7 @@ def display_tap_info():
                 else:
                     # For larger images, we need a display strategy
                     # Since we can't scale without jpegdec, we'll center and crop
-#                     display_scaled_image(last_image)
+                    #                     display_scaled_image(last_image)
                     print("Image larger than display, centering and displaying")
 
                     # Calculate center points
@@ -347,10 +418,12 @@ def display_tap_info():
     # Calculate remaining beer percentage
     if current_beer['volume'] > 0:
         # Assume a keg is typically 5000ml (5L) when full
-        full_volume = 5000  # Can be adjusted
-        remaining_percent = min(100, int((current_beer['volume'] / full_volume) * 100))
+        remaining_percent = min(100, int((current_beer['volume'] / current_beer['full_volume']) * 100))
     else:
         remaining_percent = 0
+
+    # Update the keg level LEDs
+    set_keg_level_leds(remaining_percent)
 
     # Display beer information as overlay
     y_offset = 180
@@ -424,6 +497,9 @@ def main():
     """Main function to initialize and run the system"""
     global timer_flow
 
+    # Initialize status LED to red (starting state)
+    set_status_led(STATUS_RED)
+
     # Initialize hardware
     if not init_display():
         print("Failed to initialize display, can't continue")
@@ -442,11 +518,15 @@ def main():
         if not connect_wifi():
             print("Failed to connect to WiFi again, can't continue")
             display_message("WiFi Failed!", 100)
+            # Keep status LED red
+            set_status_led(STATUS_RED)
             return
 
     # Initial fetch of tap info
     if not fetch_tap_info():
         print("Failed to fetch tap info, can't continue")
+        # Keep status LED yellow on failure
+        set_status_led(STATUS_YELLOW)
         return
 
     # Main loop
@@ -472,5 +552,5 @@ if __name__ == "__main__":
         print("Fatal error:", e)
         if tft:
             display_message(f"Error: {e}", 100)
-
-
+        # Set status LED to red on fatal error
+        set_status_led(STATUS_RED)

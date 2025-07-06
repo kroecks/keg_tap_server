@@ -31,7 +31,7 @@ def init_db():
 def index():
     conn = get_db_connection()
     beers = conn.execute('SELECT * FROM beers').fetchall()
-    taps = conn.execute('SELECT taps.id, taps.tap_id, taps.beer_id, taps.volume, taps.flow_rate, beers.name AS beer_name '
+    taps = conn.execute('SELECT taps.id, taps.tap_id, taps.beer_id, taps.volume, taps.full_volume, taps.flow_rate, beers.name AS beer_name '
                       'FROM taps LEFT JOIN beers ON taps.beer_id = beers.id').fetchall()
     conn.close()
     return render_template('index.html', beers=beers, taps=taps)
@@ -71,7 +71,7 @@ def add_beer():
 @app.route('/taps')
 def taps():
     conn = get_db_connection()
-    taps = conn.execute('SELECT taps.id, taps.tap_id, taps.beer_id, taps.volume, taps.flow_rate, beers.name AS beer_name '
+    taps = conn.execute('SELECT taps.id, taps.tap_id, taps.beer_id, taps.volume, taps.full_volume, taps.flow_rate, beers.name AS beer_name '
                       'FROM taps LEFT JOIN beers ON taps.beer_id = beers.id').fetchall()
     beers = conn.execute('SELECT * FROM beers').fetchall()
     conn.close()
@@ -83,11 +83,13 @@ def add_tap():
         tap_id = request.form['tap_id']
         beer_id = request.form['beer_id'] if request.form['beer_id'] else None
         volume = float(request.form['volume'])
+        # Just use the volume as the full_volume, since this is the starting volume
+        full_volume = volume
         flow_rate = float(request.form['flow_rate'])
 
         conn = get_db_connection()
-        conn.execute('INSERT INTO taps (tap_id, beer_id, volume, flow_rate) VALUES (?, ?, ?, ?)',
-                    (tap_id, beer_id, volume, flow_rate))
+        conn.execute('INSERT INTO taps (tap_id, beer_id, volume, full_volume, flow_rate) VALUES (?, ?, ?, ?)',
+                    (tap_id, beer_id, volume, full_volume, flow_rate))
         conn.commit()
         conn.close()
         return redirect(url_for('taps'))
@@ -110,10 +112,11 @@ def edit_tap(id):
         tap_id = request.form['tap_id']
         beer_id = request.form['beer_id'] if request.form['beer_id'] else None
         volume = float(request.form['volume'])
+        full_volume = float(request.form['full_volume'])
         flow_rate = float(request.form['flow_rate'])
 
-        conn.execute('UPDATE taps SET tap_id = ?, beer_id = ?, volume = ?, flow_rate = ? WHERE id = ?',
-                   (tap_id, beer_id, volume, flow_rate, id))
+        conn.execute('UPDATE taps SET tap_id = ?, beer_id = ?, volume = ?, full_volume = ?, flow_rate = ? WHERE id = ?',
+                   (tap_id, beer_id, volume, full_volume, flow_rate, id))
         conn.commit()
         conn.close()
         return redirect(url_for('taps'))

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS taps (
     tap_id TEXT NOT NULL,
     beer_id INTEGER,
     volume REAL NOT NULL,
+    full_volume REAL NOT NULL,
     flow_rate REAL NOT NULL,
     FOREIGN KEY (beer_id) REFERENCES beers (id)
 );
@@ -24,6 +25,6 @@ INSERT INTO beers (name, abv, image_path) VALUES
                                               ('Stout', 5.0, 'beer_images/default.jpg'),
                                               ('Pilsner', 4.2, 'beer_images/default.jpg');
 
-INSERT INTO taps (tap_id, beer_id, volume, flow_rate) VALUES
-                                                          ('tap_1', 1, 5000, 15.0),  -- 5 liters of IPA, flowing at 15ml/sec
-                                                          ('tap_2', 2, 5000, 12.0);  -- 5 liters of Stout, flowing at 12ml/sec
+INSERT INTO taps (tap_id, beer_id, volume, full_volume, flow_rate) VALUES
+                                                          ('tap_1', 1, 5000, 5000, 15.0),  -- 5 liters of IPA, flowing at 15ml/sec
+                                                          ('tap_2', 2, 5000, 5000, 12.0);  -- 5 liters of Stout, flowing at 12ml/sec
