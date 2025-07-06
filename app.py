@@ -174,6 +174,7 @@ def get_tap_info(tap_id):
         'beer_name': tap['name'],
         'beer_abv': tap['abv'],
         'volume': tap['volume'],
+        'full_volume': tap['full_volume'],
         'flow_rate': tap['flow_rate'],
         'image_path': tap['image_path']
     })

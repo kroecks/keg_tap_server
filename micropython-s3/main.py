@@ -82,6 +82,8 @@ def set_keg_level_leds(remaining_percent):
     # Calculate how many LEDs should be lit based on percentage
     leds_to_light = int((remaining_percent / 100.0) * LED_COUNT)
 
+    print(f"set_keg_level_leds leds_to_light: {leds_to_light} remaining_percent {remaining_percent}")
+
     for i in range(LED_COUNT):
         if i < leds_to_light:
             # Determine color based on percentage ranges
