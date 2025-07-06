@@ -125,6 +125,38 @@ def edit_tap(id):
     conn.close()
     return render_template('edit_tap.html', tap=tap, beers=beers)
 
+@app.route('/edit_beer/<int:id>', methods=('GET', 'POST'))
+def edit_beer(id):
+    conn = get_db_connection()
+    beer = conn.execute('SELECT * FROM beers WHERE id = ?', (id,)).fetchone()
+
+    if not beer:
+        conn.close()
+        return redirect(url_for('beers'))
+
+    if request.method == 'POST':
+        name = request.form['name']
+        abv = float(request.form['abv'])
+
+        # Handle image upload
+        image_path = beer['image_path']  # Keep existing image by default
+        if 'image' in request.files:
+            file = request.files['image']
+            if file.filename != '':
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                image_path = f'beer_images/{filename}'
+
+        conn.execute('UPDATE beers SET name = ?, abv = ?, image_path = ? WHERE id = ?',
+                     (name, abv, image_path, id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('beers'))
+
+    conn.close()
+    return render_template('edit_beer.html', beer=beer)
+
 # API Endpoints for ESP32 Communication
 @app.route('/api/tap/<tap_id>', methods=['GET'])
 def get_tap_info(tap_id):
