@@ -83,7 +83,7 @@ TAP_ID = "tap_1"  # Unique ID for each tap device
 
 ```bash
 ampy --port /dev/ttyUSB0 put boot.py
-ampy --port /dev/ttyUSB0 put main.py
+ampy --port /dev/ttyUSB0 put old_main.py
 # Upload any additional libraries
 ```
 

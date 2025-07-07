@@ -14,10 +14,10 @@ gc.threshold(gc.mem_free() // 4 + gc.mem_alloc())
 # Print system info
 print("Starting Keg Tap Display System")
 print("Memory Free:", gc.mem_free())
-print("ESP32 Flash Size:", esp32.flash_size())
+#print("ESP32 Flash Size:", esp32.flash_size())
 
 # Provide some time for system to initialize
 time.sleep(1)
 
-# Force garbage collection before main.py runs
+# Force garbage collection before old_main.py runs
 gc.collect()

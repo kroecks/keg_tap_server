@@ -1,4 +1,4 @@
-# main.py for ESP32 S3 with 240x240 display for Keg Tap monitoring
+# old_main.py for ESP32 S3 with 240x240 display for Keg Tap monitoring
 import gc
 import network
 import urequests as requests
@@ -9,10 +9,9 @@ import io
 from truetype import NotoSans_32 as noto_sans
 from truetype import NotoSerif_32 as noto_serif
 from truetype import NotoSansMono_32 as noto_mono
-from machine import Pin, SPI, Timer, freq
+from machine import Pin, SPI, Timer, freq, ADC
 import gc9a01
 import neopixel
-import machine
 from micropython import const
 
 # Set CPU frequency to 240MHz for better performance
@@ -58,6 +57,9 @@ tft = None
 last_image = None
 current_beer = None
 
+connection_blink_timer = None
+connection_blink_state = False
+
 gc.enable()
 gc.collect()
 
@@ -71,8 +73,238 @@ except:
 # Flag to control whether we try to use server-side resizing
 USE_SERVER_RESIZE = True  # Set to False if your server doesn't support this feature
 
+
+###############################################################################
+
+# Battery monitoring configuration
+BATTERY_ADC_PIN = 1  # GPIO1 - battery voltage measurement pin per wiki
+BATTERY_MIN_VOLTAGE = 3.2  # Minimum safe voltage (adjust based on your battery)
+BATTERY_MAX_VOLTAGE = 4.2  # Maximum voltage for LiPo battery (adjust if different)
+# Voltage divider: 200K + 100K resistors, so divider ratio is (200K+100K)/100K = 3.0
+
+# Global variables
+battery_adc = None
+battery_connected = False
+battery_voltage = 0.0
+battery_percentage = 0
+
+def init_battery_monitor():
+    """Initialize battery monitoring"""
+    global battery_adc, battery_connected
+
+    try:
+        # Initialize ADC for battery monitoring on GPIO1
+        battery_adc = ADC(Pin(BATTERY_ADC_PIN))
+        battery_adc.atten(ADC.ATTN_11DB)  # For 3.3V reference, allows reading up to ~3.9V
+
+        # Take initial reading to check if battery is connected
+        test_voltage = read_battery_voltage()
+
+        # If voltage is above a threshold, assume battery is connected
+        if test_voltage > 2.5:  # Adjust threshold as needed
+            battery_connected = True
+            print(f"Battery detected: {test_voltage:.2f}V")
+        else:
+            battery_connected = False
+            print("No battery detected")
+
+        return True
+    except Exception as e:
+        print(f"Error initializing battery monitor: {e}")
+        battery_connected = False
+        return False
+
+def read_battery_voltage():
+    """Read battery voltage from ADC using the board's specific conversion formula"""
+    global battery_adc, battery_voltage
+
+    if not battery_adc:
+        return 0.0
+
+    try:
+        # Take multiple readings and average them for stability
+        readings = []
+        for _ in range(5):
+            raw_value = battery_adc.read()
+            readings.append(raw_value)
+            time.sleep_ms(10)
+
+        avg_reading = sum(readings) / len(readings)
+
+        # Use the conversion formula from the wiki:
+        # voltage = 3.3 / (1<<12) * 3 * AD_Value
+        # This accounts for the 200K+100K voltage divider (factor of 3)
+        voltage = (3.3 / (1 << 12)) * 3 * avg_reading
+
+        battery_voltage = voltage
+        return voltage
+    except Exception as e:
+        print(f"Error reading battery voltage: {e}")
+        return 0.0
+
+def calculate_battery_percentage():
+    """Calculate battery percentage based on voltage"""
+    global battery_percentage
+
+    if not battery_connected or battery_voltage == 0:
+        battery_percentage = 0
+        return 0
+
+    # Linear interpolation between min and max voltage
+    if battery_voltage >= BATTERY_MAX_VOLTAGE:
+        battery_percentage = 100
+    elif battery_voltage <= BATTERY_MIN_VOLTAGE:
+        battery_percentage = 0
+    else:
+        voltage_range = BATTERY_MAX_VOLTAGE - BATTERY_MIN_VOLTAGE
+        current_range = battery_voltage - BATTERY_MIN_VOLTAGE
+        battery_percentage = int((current_range / voltage_range) * 100)
+
+    return battery_percentage
+
+def get_battery_status():
+    """Get complete battery status"""
+    if not battery_connected:
+        return {
+            'connected': False,
+            'voltage': 0.0,
+            'percentage': 0,
+            'status': 'Not connected'
+        }
+
+    voltage = read_battery_voltage()
+    percentage = calculate_battery_percentage()
+
+    # Determine status
+    if percentage > 75:
+        status = 'Good'
+    elif percentage > 50:
+        status = 'Fair'
+    elif percentage > 25:
+        status = 'Low'
+    else:
+        status = 'Critical'
+
+    return {
+        'connected': True,
+        'voltage': voltage,
+        'percentage': percentage,
+        'status': status
+    }
+
+def print_battery_info():
+    """Print battery information to console"""
+    battery_info = get_battery_status()
+
+    if battery_info['connected']:
+        print(f"Battery: {battery_info['voltage']:.2f}V ({battery_info['percentage']}%) - {battery_info['status']}")
+    else:
+        print("Battery: Not connected")
+
+    return battery_info
+
+# Modified fetch_tap_info function to include battery monitoring
+def fetch_tap_info_with_battery():
+    """Enhanced fetch_tap_info function that includes battery monitoring"""
+    global current_beer
+
+    # Check battery status
+    battery_info = print_battery_info()
+
+    try:
+        display_message("Fetching tap info...")
+        # Keep status LED yellow while fetching
+        set_status_led(STATUS_YELLOW)
+
+        response = requests.get(f"{SERVER_URL}/api/tap/{TAP_ID}")
+
+        if response.status_code == 200:
+            data = response.json()
+            current_beer = data
+            print("Tap info:", data)
+
+            # Download the beer image if it exists
+            if data['image_path']:
+                download_beer_image()
+
+            print("Retrieved image, displaying tap info")
+            display_tap_info_with_battery(battery_info)
+            return True
+        else:
+            print(f"Error fetching tap info: {response.status_code}")
+            display_message(f"Error: {response.status_code}")
+            # Keep status LED yellow on error
+            set_status_led(STATUS_YELLOW)
+            time.sleep(2)
+            return False
+    except Exception as e:
+        print("Error fetching tap info:", e)
+        display_message("Connection Error")
+        # Keep status LED yellow on error
+        set_status_led(STATUS_YELLOW)
+        time.sleep(2)
+        return False
+
+def display_tap_info_with_battery(battery_info):
+    """Enhanced display function that includes battery info"""
+    global tft, current_beer, last_image
+
+    if not tft or not current_beer:
+        return
+
+    # Clear the screen
+    tft.fill(0)
+
+    # Display beer image if available (same as before)
+    if last_image:
+        try:
+            dimensions = get_jpeg_dimensions(last_image)
+            if dimensions:
+                img_width, img_height = dimensions
+                print(f"Image dimensions: {img_width}x{img_height}")
+
+                if img_width <= DISPLAY_WIDTH and img_height <= DISPLAY_HEIGHT:
+                    x_offset = (DISPLAY_WIDTH - img_width) // 2
+                    y_offset = (DISPLAY_HEIGHT - img_height) // 2
+                    print(f"Displaying image centered at ({x_offset},{y_offset})")
+                    tft.jpg(last_image, x_offset, y_offset, gc9a01.SLOW)
+                else:
+                    print("Image larger than display, centering and displaying")
+                    img_center_x = img_width // 2
+                    img_center_y = img_height // 2
+                    x_offset = -(img_center_x - DISPLAY_WIDTH // 2)
+                    y_offset = -(img_center_y - DISPLAY_HEIGHT // 2)
+                    print(f"Centering large image with offset ({x_offset},{y_offset})")
+                    tft.jpg(last_image, x_offset, y_offset, gc9a01.SLOW)
+            else:
+                print("Unable to determine image dimensions, displaying at origin")
+                tft.jpg(last_image, 0, 0, gc9a01.FAST)
+        except Exception as e:
+            print("Error displaying image:", e)
+
+    # Calculate remaining beer percentage
+    if current_beer['volume'] > 0:
+        remaining_percent = min(100, int((current_beer['volume'] / current_beer['full_volume']) * 100))
+    else:
+        remaining_percent = 0
+
+    # Update the keg level LEDs
+    set_keg_level_leds(remaining_percent)
+
+    # Display beer information as overlay
+    center(noto_sans, current_beer['beer_name'] or "No beer", 50, gc9a01.WHITE)
+    center(noto_sans, f"{current_beer['beer_abv']}% ABV" if current_beer['beer_abv'] else "", 180, gc9a01.WHITE)
+
+    # Display battery info if connected
+    if battery_info['connected']:
+        battery_text = f"Batt: {battery_info['percentage']}%"
+        center(noto_sans, battery_text, 200, gc9a01.YELLOW)
+
 def set_status_led(color):
     """Set all LEDs to the same color for status indication"""
+
+    print(f"set_status_led : {color}")
+
     for i in range(LED_COUNT):
         status_leds[i] = color
     status_leds.write()
@@ -149,8 +381,6 @@ def display_message(message, y_pos=120):
 
 def connect_wifi():
     display_message("Connecting to WiFi...")
-    # Set status LED to red (no WiFi)
-    set_status_led(STATUS_RED)
 
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
@@ -174,14 +404,13 @@ def connect_wifi():
             print(f"IP: {ip}")
             display_message(f"Connected: {ip}", 100)
             # Set status LED to yellow (WiFi connected, loading data)
-            set_status_led(STATUS_YELLOW)
+            # set_status_led(STATUS_YELLOW)
             time.sleep(2)
             return True
         else:
             print("Failed to connect to WiFi")
             display_message("WiFi Failed!", 100)
             # Keep status LED red
-            set_status_led(STATUS_RED)
             time.sleep(2)
             return False
     else:
@@ -189,7 +418,6 @@ def connect_wifi():
         ip = wlan.ifconfig()[0]
         print(f"IP: {ip}")
         # Set status LED to yellow (WiFi connected, loading data)
-        set_status_led(STATUS_YELLOW)
         return True
 
 def fetch_tap_info():
@@ -199,11 +427,12 @@ def fetch_tap_info():
     try:
         display_message("Fetching tap info...")
         # Keep status LED yellow while fetching
-        set_status_led(STATUS_YELLOW)
+        start_connection_battery_display()
 
         response = requests.get(f"{SERVER_URL}/api/tap/{TAP_ID}")
 
         if response.status_code == 200:
+            stop_connection_battery_display()
             data = response.json()
             current_beer = data
             print("Tap info:", data)
@@ -214,22 +443,19 @@ def fetch_tap_info():
 
             print("Retrieved image, displaying tap info")
             display_tap_info()
-
-            # Set status LED to green (tap data loaded successfully)
-            set_status_led(STATUS_GREEN)
             return True
         else:
             print(f"Error fetching tap info: {response.status_code}")
             display_message(f"Error: {response.status_code}")
             # Keep status LED yellow on error
-            set_status_led(STATUS_YELLOW)
+            set_status_led(STATUS_RED)
             time.sleep(2)
             return False
     except Exception as e:
         print("Error fetching tap info:", e)
         display_message("Connection Error")
         # Keep status LED yellow on error
-        set_status_led(STATUS_YELLOW)
+        set_status_led(STATUS_RED)
         time.sleep(2)
         return False
 
@@ -433,6 +659,8 @@ def display_tap_info():
     center(noto_sans,f"{current_beer['beer_abv']}% ABV" if current_beer['beer_abv'] else "", y_offset, gc9a01.WHITE)
 #     center(noto_sans, f"Left: {remaining_percent}%", 20 + y_offset, gc9a01.WHITE)
 
+    print_battery_info()
+
 def flow_callback(p):
     """Interrupt handler for flow sensor pulses"""
     global flow_count, flow_start_time, flow_active
@@ -495,9 +723,77 @@ def report_pour_event(event_type, duration=None):
         print("Error reporting pour event:", e)
         return False
 
+def set_battery_level_leds_connecting(battery_percentage):
+    """Set LEDs to show battery level during connection with blinking top LED"""
+    global connection_blink_state
+
+    # Calculate how many LEDs should be lit based on battery percentage
+    if battery_percentage > 0:
+        leds_to_light = max(1, int((battery_percentage / 100.0) * LED_COUNT))
+    else:
+        leds_to_light = 0
+
+    print(f"Connection battery display: {battery_percentage}% = {leds_to_light} LEDs")
+
+    for i in range(LED_COUNT):
+        if i < leds_to_light - 1:
+            # Static yellow LEDs for all but the top one
+            status_leds[i] = STATUS_YELLOW
+        elif i == leds_to_light - 1:
+            # Top LED blinks
+            if connection_blink_state:
+                status_leds[i] = STATUS_YELLOW
+            else:
+                status_leds[i] = KEG_EMPTY  # Off
+        else:
+            # Turn off LEDs that shouldn't be lit
+            status_leds[i] = KEG_EMPTY
+
+    status_leds.write()
+
+def connection_blink_callback(timer):
+    """Timer callback to handle blinking during connection"""
+    global connection_blink_state
+
+    connection_blink_state = not connection_blink_state
+
+    print("connection_blink_callback")
+
+    # Get current battery status and update LEDs
+    battery_info = get_battery_status()
+    set_battery_level_leds_connecting(battery_info['percentage'])
+
+def start_connection_battery_display():
+    """Start the battery level display during connection"""
+    global connection_blink_timer
+
+    print("start_connection_battery_display")
+
+    # Initialize battery display
+    battery_info = get_battery_status()
+    set_battery_level_leds_connecting(battery_info['percentage'])
+
+    # Start blinking timer (blink every 500ms)
+    connection_blink_timer = Timer(1)
+    connection_blink_timer.init(period=500, mode=Timer.PERIODIC, callback=connection_blink_callback)
+
+def stop_connection_battery_display():
+    """Stop the battery level display and clean up timer"""
+    global connection_blink_timer
+
+    print("start_connection_battery_display")
+
+    if connection_blink_timer:
+        connection_blink_timer.deinit()
+        connection_blink_timer = None
+    else:
+        print("start_connection_battery_display NO TIMER TO STOP")
+
 def main():
     """Main function to initialize and run the system"""
     global timer_flow
+
+    init_battery_monitor()
 
     # Initialize status LED to red (starting state)
     set_status_led(STATUS_RED)
@@ -513,6 +809,8 @@ def main():
     # Create timer for flow detection
     timer_flow = Timer(0)
 
+    start_connection_battery_display()
+
     # Connect to WiFi
     if not connect_wifi():
         print("Failed to connect to WiFi, retrying in 5 seconds")
@@ -523,6 +821,8 @@ def main():
             # Keep status LED red
             set_status_led(STATUS_RED)
             return
+
+    stop_connection_battery_display()
 
     # Initial fetch of tap info
     if not fetch_tap_info():
